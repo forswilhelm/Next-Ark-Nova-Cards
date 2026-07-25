@@ -9,7 +9,12 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { BaseAnimalCard } from '@/components/cards/animal_cards/BaseAnimalCard';
+import { ProjectCard as ProjectCardPreview } from '@/components/cards/project_cards/ProjectCard';
 import { AnimalCardForm } from '@/components/forms/AnimalCardForm';
+import {
+  initialDiyProjectCard,
+  ProjectCardForm,
+} from '@/components/forms/ProjectCardForm';
 import Layout from '@/components/layout/Layout';
 import Seo from '@/components/Seo';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +29,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import {
   AnimalCard,
@@ -32,6 +38,11 @@ import {
 } from '@/types/AnimalCard';
 import { CardSource } from '@/types/CardSource';
 import { Ability } from '@/types/KeyWords';
+import {
+  ProjectCard,
+  ProjectCardSchema,
+  ProjectCardSchemaDto,
+} from '@/types/ProjectCard';
 import { SpecialEnclosure } from '@/types/SpecialEnclosure';
 
 export default function Page(
@@ -39,6 +50,7 @@ export default function Page(
 ) {
   const { t } = useTranslation('common');
   const downloadRef = React.useRef<HTMLDivElement>(null);
+  const projectDownloadRef = React.useRef<HTMLDivElement>(null);
   const initialDiyAnimalCard = {
     id: 'FAN',
     name: '',
@@ -145,6 +157,73 @@ export default function Page(
 
   const debouncedHandleValuesChange = debounce(handleValuesChange, 300);
 
+  const [isResettingProject, setIsResettingProject] = useState(false);
+  const [diyProjectCard, setDiyProjectCard] = useState(initialDiyProjectCard);
+  useEffect(() => {
+    if (isResettingProject) {
+      setIsResettingProject(false);
+    }
+  }, [isResettingProject]);
+
+  const handleDownloadProjectImage = async () => {
+    if (projectDownloadRef.current === null) {
+      return;
+    }
+
+    toPng(projectDownloadRef.current, { quality: 0.8, pixelRatio: 3 })
+      .then((dataUrl) => {
+        const link = document.createElement('a');
+        link.download = diyProjectCard.name + '.png';
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      })
+      .catch((err) => {
+        toast.error(err instanceof Error ? err?.message : 'Unknown error');
+      });
+  };
+
+  const handleProjectValuesChange = (values: ProjectCardSchemaDto) => {
+    setDiyProjectCard(values);
+  };
+
+  const handleProjectJsonImport = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const fileReader = new FileReader();
+    if (!e.target.files) {
+      return;
+    }
+    fileReader.readAsText(e.target.files[0], 'UTF-8');
+    fileReader.onload = (event) => {
+      if (!event.target) {
+        return;
+      }
+      try {
+        const parsedData = JSON.parse(event.target.result as string);
+
+        const result = ProjectCardSchema.safeParse(parsedData);
+        if (!result.success) {
+          alert(
+            'The parsed JSON does not match the expected Project Card structure.',
+          );
+          return;
+        }
+
+        setDiyProjectCard(parsedData);
+        setIsResettingProject(true);
+      } catch (_) {
+        alert("Failed to parse the JSON. Please ensure it's a valid JSON.");
+      }
+    };
+  };
+
+  const debouncedHandleProjectValuesChange = debounce(
+    handleProjectValuesChange,
+    300,
+  );
+
   return (
     <Layout>
       <Seo templateTitle='Ark Nova Card Maker' />
@@ -158,48 +237,104 @@ export default function Page(
           </Link>
         </Button>
       </div>
-      <div className='flex flex-col items-center gap-8 px-3 py-8 md:flex-row md:items-start md:justify-center md:gap-12 md:px-6 lg:gap-16'>
-        <div className='mt-6 w-full max-w-full overflow-x-auto py-4 md:sticky md:top-24 md:mt-4'>
-          <div className='mx-auto w-fit origin-top scale-95 sm:scale-110 md:scale-125 xl:scale-150'>
-            <div ref={downloadRef}>
-              <BaseAnimalCard animal={valuesToAnimalCard(diyAnimalCard)} />
+      <Tabs defaultValue='animal' className='flex flex-col items-center'>
+        <TabsList>
+          <TabsTrigger value='animal'>{t('diy.tab_animal')}</TabsTrigger>
+          <TabsTrigger value='project'>{t('diy.tab_project')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value='animal' className='w-full'>
+          <div className='flex flex-col items-center gap-8 px-3 py-8 md:flex-row md:items-start md:justify-center md:gap-12 md:px-6 lg:gap-16'>
+            <div className='mt-6 w-full max-w-full overflow-x-auto py-4 md:sticky md:top-24 md:mt-4'>
+              <div className='mx-auto w-fit origin-top scale-95 sm:scale-110 md:scale-125 xl:scale-150'>
+                <div ref={downloadRef}>
+                  <BaseAnimalCard animal={valuesToAnimalCard(diyAnimalCard)} />
+                </div>
+              </div>
             </div>
+            <Card className='w-full max-w-[400px] bg-card/80 backdrop-blur-sm'>
+              <CardHeader>
+                <CardTitle>{t('diy.card_maker')}</CardTitle>
+                <CardDescription>
+                  {t('diy.create_your_own_animal_card')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AnimalCardForm
+                  defaultValues={diyAnimalCard}
+                  onValuesChange={debouncedHandleValuesChange}
+                  isResetting={isResetting}
+                />
+              </CardContent>
+              <CardFooter className='flex flex-col items-start gap-4'>
+                <div className='grid w-full items-center gap-1.5'>
+                  <Label htmlFor='animal-json-import'>
+                    {t('diy.import_json')}
+                  </Label>
+                  <Input
+                    id='animal-json-import'
+                    type='file'
+                    value=''
+                    onChange={handleJsonImport}
+                  />
+                </div>
+                <Button
+                  variant='nature'
+                  className='w-full sm:w-auto'
+                  onClick={handleDownloadImage}
+                >
+                  {t('diy.Download')}
+                </Button>
+              </CardFooter>
+            </Card>
           </div>
-        </div>
-        <Card className='w-full max-w-[400px] bg-card/80 backdrop-blur-sm'>
-          <CardHeader>
-            <CardTitle>{t('diy.card_maker')}</CardTitle>
-            <CardDescription>
-              {t('diy.create_your_own_animal_card')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AnimalCardForm
-              defaultValues={diyAnimalCard}
-              onValuesChange={debouncedHandleValuesChange}
-              isResetting={isResetting}
-            />
-          </CardContent>
-          <CardFooter className='flex flex-col items-start gap-4'>
-            <div className='grid w-full items-center gap-1.5'>
-              <Label htmlFor='animal-json-import'>{t('diy.import_json')}</Label>
-              <Input
-                id='animal-json-import'
-                type='file'
-                value=''
-                onChange={handleJsonImport}
-              />
+        </TabsContent>
+        <TabsContent value='project' className='w-full'>
+          <div className='flex flex-col items-center gap-8 px-3 py-8 md:flex-row md:items-start md:justify-center md:gap-12 md:px-6 lg:gap-16'>
+            <div className='mt-6 w-full max-w-full overflow-x-auto py-4 md:sticky md:top-24 md:mt-4'>
+              <div className='mx-auto w-fit origin-top scale-95 sm:scale-110 md:scale-125 xl:scale-150'>
+                <div ref={projectDownloadRef}>
+                  <ProjectCardPreview project={diyProjectCard as ProjectCard} />
+                </div>
+              </div>
             </div>
-            <Button
-              variant='nature'
-              className='w-full sm:w-auto'
-              onClick={handleDownloadImage}
-            >
-              {t('diy.Download')}
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
+            <Card className='w-full max-w-[400px] bg-card/80 backdrop-blur-sm'>
+              <CardHeader>
+                <CardTitle>{t('diy.card_maker')}</CardTitle>
+                <CardDescription>
+                  {t('diy.create_your_own_project_card')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ProjectCardForm
+                  defaultValues={diyProjectCard}
+                  onValuesChange={debouncedHandleProjectValuesChange}
+                  isResetting={isResettingProject}
+                />
+              </CardContent>
+              <CardFooter className='flex flex-col items-start gap-4'>
+                <div className='grid w-full items-center gap-1.5'>
+                  <Label htmlFor='project-json-import'>
+                    {t('diy.import_json')}
+                  </Label>
+                  <Input
+                    id='project-json-import'
+                    type='file'
+                    value=''
+                    onChange={handleProjectJsonImport}
+                  />
+                </div>
+                <Button
+                  variant='nature'
+                  className='w-full sm:w-auto'
+                  onClick={handleDownloadProjectImage}
+                >
+                  {t('diy.Download')}
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </Layout>
   );
 }
