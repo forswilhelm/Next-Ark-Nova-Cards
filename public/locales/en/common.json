@@ -599,7 +599,19 @@
     "export_json": "Export as JSON",
     "import_json": "Import JSON",
     "add_exist_ability": "Existing Ability",
-    "bug": "This function has a unsolved bug. Please do not delete original abilities before your customized abilities."
+    "bug": "This function has a unsolved bug. Please do not delete original abilities before your customized abilities.",
+    "tab_animal": "Animal Card",
+    "tab_project": "Project Card",
+    "create_your_own_project_card": "Create your own project card.",
+    "project_name": "Project Name",
+    "project_category": "Category",
+    "project_tag": "Tag",
+    "slot": "Slot",
+    "slot_indicator": "indicator",
+    "bonus_type": "Bonus Type",
+    "bonus_value": "Value",
+    "add_bonus": "Add Bonus",
+    "use_image_directly": "Use Uploaded Image Directly"
   },
   "maps": {
     "alternative_title": "Now BGA has alternative maps!",
